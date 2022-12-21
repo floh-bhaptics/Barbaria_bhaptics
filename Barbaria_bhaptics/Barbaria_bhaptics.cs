@@ -22,7 +22,7 @@ namespace Barbaria_bhaptics
             tactsuitVr = new TactsuitVR();
             tactsuitVr.PlaybackHaptics("HeartBeat");
         }
-        
+
         [HarmonyPatch(typeof(CombatManager), "KillPlayer", new Type[] { })]
         public class bhaptics_PlayerDies
         {
@@ -67,6 +67,17 @@ namespace Barbaria_bhaptics
             }
         }
 
+        [HarmonyPatch(typeof(MoodMusic), "OnPossessionChange", new Type[] { typeof(bool) })]
+        public class bhaptics_PossessionChange
+        {
+            [HarmonyPostfix]
+            public static void Postfix(bool enteringHero)
+            {
+                if (enteringHero) tactsuitVr.PlaybackHaptics("EnterHero");
+                else tactsuitVr.PlaybackHaptics("ExitHero");
+            }
+        }
+
         [HarmonyPatch(typeof(CombatEffect), "ApplyEffectDamage", new Type[] { typeof(CombatEffectDef), typeof(int), typeof(int), typeof(UnityEngine.Vector3), typeof(UnityEngine.Vector3), typeof(CombatHit), typeof(PotentialDamage) })]
         public class bhaptics_PlayerDamage
         {
@@ -98,6 +109,6 @@ namespace Barbaria_bhaptics
                 tactsuitVr.StartHeartBeat();
             }
         }
-        
+
     }
 }
