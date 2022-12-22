@@ -7,6 +7,8 @@ using MelonLoader;
 using HarmonyLib;
 using MyBhapticsTactsuit;
 using Il2Cpp;
+using Il2CppECS;
+using UnityEngine;
 
 [assembly: MelonInfo(typeof(Barbaria_bhaptics.Barbaria_bhaptics), "Barbaria_bhaptics", "1.0.0", "Florian Fahrenberger")]
 [assembly: MelonGame("Stalwart Games", "Barbaria")]
@@ -16,6 +18,7 @@ namespace Barbaria_bhaptics
     public class Barbaria_bhaptics : MelonMod
     {
         public static TactsuitVR tactsuitVr = null!;
+        public static int playerEntityID = 0;
 
         public override void OnInitializeMelon()
         {
@@ -34,24 +37,12 @@ namespace Barbaria_bhaptics
             }
         }
 
-        [HarmonyPatch(typeof(CombatManager), "ProcessHit", new Type[] { typeof(CombatHit), typeof(Il2CppECS.CollisionInfo) })]
-        public class bhaptics_ProcessHit
-        {
-            [HarmonyPostfix]
-            public static void Postfix(CombatManager __instance, CombatHit hit, Il2CppECS.CollisionInfo collision)
-            {
-                if (hit.headShot) tactsuitVr.LOG("Headshot");
-                if (hit.landed) { tactsuitVr.PlaybackHaptics("RecoilBladeVest_R"); tactsuitVr.LOG("Damage: " + hit.damage.ToString()); }
-            }
-        }
-
         [HarmonyPatch(typeof(PossessFx), "PlayHeroFx")]
         public class bhaptics_PossessHero
         {
             [HarmonyPostfix]
             public static void Postfix()
             {
-                tactsuitVr.LOG("PlayHeroFx");
                 tactsuitVr.PlaybackHaptics("EnterHero");
             }
         }
@@ -62,40 +53,47 @@ namespace Barbaria_bhaptics
             [HarmonyPostfix]
             public static void Postfix()
             {
-                tactsuitVr.LOG("PlayImmortalFx");
                 tactsuitVr.PlaybackHaptics("EnterHero");
             }
         }
 
-        [HarmonyPatch(typeof(MoodMusic), "OnPossessionChange", new Type[] { typeof(bool) })]
-        public class bhaptics_PossessionChange
-        {
-            [HarmonyPostfix]
-            public static void Postfix(bool enteringHero)
-            {
-                if (enteringHero) tactsuitVr.PlaybackHaptics("EnterHero");
-                else tactsuitVr.PlaybackHaptics("ExitHero");
-            }
-        }
-
-        [HarmonyPatch(typeof(CombatEffect), "ApplyEffectDamage", new Type[] { typeof(CombatEffectDef), typeof(int), typeof(int), typeof(UnityEngine.Vector3), typeof(UnityEngine.Vector3), typeof(CombatHit), typeof(PotentialDamage) })]
+        /*
+        [HarmonyPatch(typeof(CombatManager), "ApplyCombatHit", new Type[] { typeof(CombatHit) })]
         public class bhaptics_PlayerDamage
         {
             [HarmonyPostfix]
-            public static void Postfix()
+            public static void Postfix(CombatManager __instance, CombatHit hit)
             {
-                tactsuitVr.LOG("ApplyEffectDamage");
+                tactsuitVr.LOG("HitEntityID: " + hit.hitFighterEntityId.ToString() + " " + hit.attackFighterEntityId.ToString());
+                if (hit.hitFighterEntityId == playerEntityID) tactsuitVr.LOG("Fighter?");
             }
         }
+        */
 
-        [HarmonyPatch(typeof(CombatEffect), "ApplyEffectHeal", new Type[] { typeof(CombatEffectDef) })]
-        public class bhaptics_PlayerHeal
+        [HarmonyPatch(typeof(SysPlayerHitDisplay), "DamageTaken", new Type[] { typeof(int), typeof(CombatHit) })]
+        public class bhaptics_PlayerDamage
         {
             [HarmonyPostfix]
-            public static void Postfix()
+            public static void Postfix(SysPlayerHitDisplay __instance, int playerControlledEntityId, CombatHit hit)
             {
-                tactsuitVr.LOG("Heal");
-                tactsuitVr.StopHeartBeat();
+                //tactsuitVr.LOG("HitEntityID: " + hit.hitFighterEntityId.ToString() + " " + hit.attackFighterEntityId.ToString() + " " + playerEntityID.ToString());
+                if (hit.hitFighterEntityId != playerEntityID) return;
+                string pattern = "HitImpact";
+                if (hit.freeze) pattern = "HitFreeze";
+                if (hit.headShot) pattern = "HitInTheFace";
+                if (hit.shock) pattern = "HitShock";
+                if (hit.stab) pattern = "HitStab";
+                if (hit.burn) pattern = "HitBurn";
+                Vector3 patternOrigin = new Vector3(0f, 0f, 1f);
+                Vector3 flattenedHit = new Vector3(hit.direction.x, 0f, hit.direction.z);
+                float earlyhitAngle = Vector3.Angle(flattenedHit, patternOrigin);
+                Vector3 earlycrossProduct = Vector3.Cross(flattenedHit, patternOrigin);
+                if (earlycrossProduct.y > 0f) { earlyhitAngle *= -1f; }
+                float myRotation = earlyhitAngle;
+                if (earlycrossProduct.y > 0f) { earlyhitAngle *= -1f; }
+                //myRotation *= -1f;
+                if (myRotation < 0f) { myRotation = 360f + myRotation; }
+                tactsuitVr.PlayBackHit(pattern, myRotation, 0.0f);
             }
         }
 
@@ -103,10 +101,30 @@ namespace Barbaria_bhaptics
         public class bhaptics_LowHealth
         {
             [HarmonyPostfix]
-            public static void Postfix()
+            public static void Postfix(bool lowHealth)
             {
-                tactsuitVr.LOG("SetLowHealth");
-                tactsuitVr.StartHeartBeat();
+                if (lowHealth) tactsuitVr.StartHeartBeat();
+                else tactsuitVr.StopHeartBeat();
+            }
+        }
+
+        [HarmonyPatch(typeof(UIScreenHitEffect), "SetDead", new Type[] { typeof(bool) })]
+        public class bhaptics_SetDead
+        {
+            [HarmonyPostfix]
+            public static void Postfix(bool dead)
+            {
+                if (dead) tactsuitVr.StopThreads();
+            }
+        }
+
+        [HarmonyPatch(typeof(WorldManager), "GetPlayerControlledEntity", new Type[] {  })]
+        public class bhaptics_WorldManagerUpdate
+        {
+            [HarmonyPostfix]
+            public static void Postfix(WorldManager __instance, ref int __result)
+            {
+                playerEntityID = __result;
             }
         }
 
