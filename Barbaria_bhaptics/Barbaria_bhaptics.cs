@@ -9,8 +9,10 @@ using MyBhapticsTactsuit;
 using Il2Cpp;
 using Il2CppECS;
 using UnityEngine;
+using System.Runtime.ExceptionServices;
+using UnityEngine.Playables;
 
-[assembly: MelonInfo(typeof(Barbaria_bhaptics.Barbaria_bhaptics), "Barbaria_bhaptics", "1.0.0", "Florian Fahrenberger")]
+[assembly: MelonInfo(typeof(Barbaria_bhaptics.Barbaria_bhaptics), "Barbaria_bhaptics", "2.0.1", "Florian Fahrenberger")]
 [assembly: MelonGame("Stalwart Games", "Barbaria")]
 
 namespace Barbaria_bhaptics
@@ -19,6 +21,8 @@ namespace Barbaria_bhaptics
     {
         public static TactsuitVR tactsuitVr = null!;
         public static int playerEntityID = 0;
+        public static int rightWeapon = 0;
+        public static int leftWeapon = 0;
 
         public override void OnInitializeMelon()
         {
@@ -58,14 +62,37 @@ namespace Barbaria_bhaptics
         }
 
         /*
-        [HarmonyPatch(typeof(CombatManager), "ApplyCombatHit", new Type[] { typeof(CombatHit) })]
-        public class bhaptics_PlayerDamage
+        [HarmonyPatch(typeof(BaseController), "PlayHaptic", new Type[] { typeof(HapticType) })]
+        public class bhaptics_PlayHaptic
         {
             [HarmonyPostfix]
-            public static void Postfix(CombatManager __instance, CombatHit hit)
+            public static void Postfix(BaseController __instance, HapticType type)
             {
-                tactsuitVr.LOG("HitEntityID: " + hit.hitFighterEntityId.ToString() + " " + hit.attackFighterEntityId.ToString());
-                if (hit.hitFighterEntityId == playerEntityID) tactsuitVr.LOG("Fighter?");
+                if (type < 0) return;
+                //tactsuitVr.LOG("Haptic: " + type.ToString());
+                bool isRightHand = true;
+                //isRightHand = (__instance.)
+                
+                switch (type)
+                {
+                    case HapticType.None:
+                        return;
+                    case HapticType.Default:
+                        //tactsuitVr.Recoil(isRightHand);
+                        break;
+                    case HapticType.SwordHitSword:
+                        tactsuitVr.Recoil(isRightHand);
+                        break;
+                    case HapticType.SwordHitShield:
+                        tactsuitVr.Recoil(isRightHand);
+                        break;
+                    case HapticType.SwordHitBody:
+                        tactsuitVr.Recoil(isRightHand);
+                        break;
+                    default:
+                        return;
+                }
+                
             }
         }
         */
@@ -76,6 +103,15 @@ namespace Barbaria_bhaptics
             [HarmonyPostfix]
             public static void Postfix(SysPlayerHitDisplay __instance, int playerControlledEntityId, CombatHit hit)
             {
+                /*
+                if (hit.attackFighterEntityId == playerControlledEntityId)
+                {
+                    //possible attacks go here
+                    if (hit.attackEntityId == rightWeapon) tactsuitVr.Recoil(true);
+                    if (hit.attackEntityId == leftWeapon) tactsuitVr.Recoil(false);
+                    return;
+                }
+                */
                 //tactsuitVr.LOG("HitEntityID: " + hit.hitFighterEntityId.ToString() + " " + hit.attackFighterEntityId.ToString() + " " + playerEntityID.ToString());
                 if (hit.hitFighterEntityId != playerEntityID) return;
                 string pattern = "HitImpact";

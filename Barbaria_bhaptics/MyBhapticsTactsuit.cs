@@ -50,9 +50,7 @@ namespace MyBhapticsTactsuit
 
         public void LOG(string logStr)
         {
-#pragma warning disable CS0618 // remove warning that the logger is deprecated
             MelonLogger.Msg(logStr);
-#pragma warning restore CS0618
         }
 
 
